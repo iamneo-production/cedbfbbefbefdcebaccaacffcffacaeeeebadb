@@ -1,290 +1,106 @@
-urlvalidator.jsx
+//UrlValidator.js
+import React, { useState,useEffect } from 'react';
 
-import React, { useEffect, useState } from 'react';
+function UrlValidator() {
+  const [domain, setDomain] = useState('');
+  const [path, setPath] = useState('');
+  const [method, setMethod] = useState('GET');
+  const [body, setBody] = useState('');
+  const [message, setMessage] = useState('');
 
-const UrlValidator = () => {
+  useEffect(() => {
+    if (domain && path && method) {
+      let url = "";
 
-    let [disabled,setDisabled] = useState(false);
-
-    const isValidateDomain = (d) => {
-        if(d.startsWith("www.") && d.endsWith(".com")) {
-            return true;
-        }
-        return false;
+    // Validate domain and path ^w+\.[A-Za-z0-9]+\.com$
+    if (!/^w+\.[A-Za-z0-9]+\.com$/i.test(domain)) {
+      setMessage('Invalid URL! Please recheck your URL');
+      return;
+    }
+    
+    const cleanedPath = path.trim().replace(' ', '/');
+   
+    // Validate body for POST and PUT methods
+    if (['POST', 'PUT'].includes(method)) {
+      if((body.trim().length === 0) || (body.trim().length > 0 && (!/^\{.*"[A-Za-z]+".*:.*"[A-Za-z]+".*\}$/i.test(body)))) {
+      setMessage('Error in the Body');
+      return;
+      }
+    }
+    
+    if(['GET'].includes(method) && body.trim().length > 0) {
+      if(!/^\{.*"[A-Za-z]+".*:.*"[A-Za-z]+".*\}$/i.test(body)) {
+      setMessage('Error in the Body of the Query Params');
+      return;
+      }
     }
 
-    const convertToPath = (input) => {
-        return '/' + input.split(" ").join("/");
+    // Construct URL
+    
+    if(['GET'].includes(method) && body.trim().length > 0) {
+      let te = body.trim().replace(/[\s\{\}\"]+/g,"");
+      const tem = te.trim().replace(":","=");
+      url = `${domain}/${cleanedPath}?${tem}`;
+    }
+    else {
+      url = `${domain}/${cleanedPath}`;
     }
 
-    const convertJson = (jsonString) => {
-        const jsonObject = JSON.parse(jsonString);
-        const params = "?" + Object.entries(jsonObject).map((e) => e.join("=")).join("&");
-        return params;
+    // Log URL and body for debugging
+    console.log(`URL: ${url}`);
+    console.log(`Body: ${body}`);
+
+    // Clear form and show success message
+    setDomain('');
+    setPath('');
+    setMethod('GET');
+    setBody('');
+    setMessage(url);
     }
+  }, [domain, path, method]);
 
-    const isValidJson = (jsonString) => {
-        try {
-            JSON.parse(jsonString);
-            return true;
-        } catch (e) {
-            return false;
-        }
-    }
+  const handleSubmit = (event) => {
+    event.preventDefault();
 
-    const validateForm = (domain,path,method,body) => {
-        if (!isValidateDomain(domain)) {
-            console.log("went");
-            return "Invalid URL! Please recheck your URL";
-        }
-        if (method === "GET") {
-            if (Object.keys(body).length === 0 ) return "";
-            if (!isValidJson(body)) return "Error in the Body of the Query Params";
-        }
-        if (method === "POST" || method === "PUT") {
-            if(Object.keys(body).length === 0) 
-                return "Error in the Body";
-            if(!isValidJson(body)) {
-                return "Error in the Body";
-            }
-        }
-        return "";
-    }
+    const target = event.target;
+    setDomain(target[0].value);
+    setPath(target[1].value);
+    setMethod(target[2].value);
+    setBody(target[3].value);
+    
+  }
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        let domain = e.target[0].value;
-        let path = e.target[1].value;
-        let method = e.target[2].value;
-        let body = e.target[3].value;
-        let tmp_msg = validateForm(domain,path,method,body);
-        console.log(tmp_msg)
-        if(tmp_msg==="") {
-            console.log("success");
-            let link = domain + convertToPath(path)
-            if (Object.keys(body).length != 0 && method === "GET") link = link + convertJson(body);
-            console.log(typeof link);
-            document.getElementById("message").textContent = link.trim();
-            console.log(link.trim());
-        }
-        else {
-            document.getElementById("message").textContent = tmp_msg;
+  return (
+    <div data-testid="url-validator">
+      <form data-testid="submit" onSubmit={handleSubmit}>
+        <label htmlFor="domain">Domain:</label>
+        <input data-testid="domain" type="text" id="domain" value={domain} onChange={(event) => setDomain(event.target.value)} />
+
+        <label htmlFor="path">Path:</label>
+        <input data-testid="path" type="text" id="path" value={path} onChange={(event) => setPath(event.target.value)} />
+
+        <label htmlFor="method">Method:</label>
+        <select data-testid="method" id="method" value={method} onChange={(event) => setMethod(event.target.value)} >
+          <option value="GET">GET</option>
+          <option value="POST">POST</option>
+          <option value="PUT">PUT</option>
+          <option value="DELETE">DELETE</option>
+        </select>
+
+        {method !== "DELETE" &&
+          <React.Fragment>
+            <label htmlFor="body">Body:</label>
+            <textarea data-testid="body" id="body" value={body} onChange={(event) => setBody(event.target.value)} ></textarea>
+          </React.Fragment>
         }
 
-    }
-    return (
-        <div className="main-div">
-            <div data-testid="message" id="message"></div>
-            <form data-testid="submit" onSubmit={handleSubmit}>
+        <button type="submit">Validate URL</button>
+      </form>
 
-                <label>
-                    Domain:
-                    <input data-testid="domain" type="text" />
-                </label>
-                <br />
-                <label>
-                    Path:
-                    <input data-testid="path" type="text" />
-                </label>
-                <br />
-                <label>
-                    Method:
-                    <select data-testid="method" defaultValue="GET" id="method" onChange={(e)=>{
-                        console.log(e);
-                        (document.getElementById("method").value==="DELETE") ? setDisabled(true) : setDisabled(false);
-                    }}>
-                        <option value="GET">GET</option>
-                        <option value="POST">POST</option>
-                        <option value="PUT">PUT</option>
-                        <option value="DELETE">DELETE</option>
-                    </select>
-                </label>
-                <br />
-                <label>
-                    Body:
-                    <textarea data-testid="body" 
-                        disabled={disabled}  
-                     />
-                </label>
-                <br />
-                <button type="submit">Validate</button>
-            </form>
-        </div>
-    );
+      {message && <div data-testid="message">{message}</div>}
+      
+    </div>
+  );
 }
 
-export default UrlValidator;
-urlvalidatortest.js
-import UrlValidator from "../components/UrlValidator/UrlValidator";
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
-
-describe('Test URL Validator', () => {
-
-    test('testcase1', () => {
-        render(<UrlValidator />);
-
-        const inputDomain = screen.getByTestId('domain');
-        const inputPath = screen.getByTestId('path');
-        const inputMethod = screen.getByTestId('method');
-        const inputBody = screen.getByTestId('body');
-
-        const form = screen.getByTestId('submit');
-
-        expect(inputDomain).toBeTruthy();
-        expect(inputPath).toBeTruthy();
-        expect(inputMethod).toBeTruthy();
-        expect(inputBody).toBeTruthy();
-
-        
-        fireEvent.submit(form, {
-            target : [
-                {value : 'www.google.com'},
-                {value : 'search all'},
-                {value : 'GET'},
-                {value : ''},
-                
-            ]
-        });
-
-        const message = screen.getByTestId('message');
-        expect(message.textContent).toBe('www.google.com/search/all');
-
-    });
-
-    test('testcase2', () => {
-        render(<UrlValidator />);
-
-        const inputDomain = screen.getByTestId('domain');
-        const inputPath = screen.getByTestId('path');
-        const inputMethod = screen.getByTestId('method');
-        const inputBody = screen.getByTestId('body');
-
-        const form = screen.getByTestId('submit');
-
-        expect(inputDomain).toBeTruthy();
-        expect(inputPath).toBeTruthy();
-        expect(inputMethod).toBeTruthy();
-        expect(inputBody).toBeTruthy();
-
-        
-        fireEvent.submit(form, {
-            target : [
-                {value : 'www.google.com'},
-                {value : 'search all'},
-                {value : 'GET'},
-                {value : '{\"Name\":\"Max\"}'},
-                
-            ]
-        });
-
-        const message = screen.getByTestId('message');
-        expect(message.textContent).toBe('www.google.com/search/all?Name=Max');
-
-    });
-
-    test('testcase3', () => {
-        render(<UrlValidator />);
-
-        const form = screen.getByTestId('submit');
-        const inputMethod = screen.getByTestId('method');
-
-        fireEvent.change(inputMethod, {target : {value : 'POST'}})
-        
-        fireEvent.submit(form, {
-            target : [
-                {value : 'www.google.com'},
-                {value : 'posts'},
-                {value : 'POST'},
-                {value : '{\"Name\":\"Max\"}'}
-            ]
-        });
-
-        const message = screen.getByTestId('message');
-        expect(message.textContent).toBe('www.google.com/posts');
-
-    })
-
-    test('testcase4', () => {
-        render(<UrlValidator />);
-
-        const inputDomain = screen.getByTestId('domain');
-        const inputPath = screen.getByTestId('path');
-        const inputMethod = screen.getByTestId('method');
-        const body = screen.getByTestId('body');
-
-        const form = screen.getByTestId('submit');
-        
-        fireEvent.change(inputDomain, {target : {value: 'www.google.com'}});
-        fireEvent.change(inputPath, {target : {value: 'search all'}});
-        fireEvent.change(inputMethod, {target : {value: 'POST'}});
-        
-        fireEvent.submit(form, {
-            target : [
-                {value : 'www.google.com'},
-                {value : 'search all'},
-                {value : 'POST'},
-                {value : ''},
-                
-            ]
-        });
-
-        const message = screen.getByTestId('message');
-        expect(message.textContent).toBe('Error in the Body');
-
-    })
-
-    test('testcase5', () => {
-        render(<UrlValidator />);
-
-        const form = screen.getByTestId('submit');
-        const inputMethod = screen.getByTestId('method');
-
-        fireEvent.change(inputMethod, {target : {value : 'DELETE'}})
-        
-        fireEvent.submit(form, {
-            target : [
-                {value : 'www.google.com'},
-                {value : 'posts'},
-                {value : 'DLETE'},
-                {value : ''}
-            ]
-        });
-
-        const message = screen.getByTestId('message');
-        expect(message.textContent).toBe('www.google.com/posts');
-
-    });
-
-    test('testcase6', () => {
-        render(<UrlValidator />);
-
-        const inputDomain = screen.getByTestId('domain');
-        const inputPath = screen.getByTestId('path');
-        const inputMethod = screen.getByTestId('method');
-        const inputBody = screen.getByTestId('body');
-
-        const form = screen.getByTestId('submit');
-
-        expect(inputDomain).toBeTruthy();
-        expect(inputPath).toBeTruthy();
-        expect(inputMethod).toBeTruthy();
-        expect(inputBody).toBeTruthy();
-
-        
-        fireEvent.submit(form, {
-            target : [
-                {value : 'www.google.com'},
-                {value : 'search all'},
-                {value : 'GET'},
-                {value : '{\"Name\":\"Max\"'},
-                
-            ]
-        });
-
-        const message = screen.getByTestId('message');
-        expect(message.textContent).toBe('Error in the Body of the Query Params');
-
-    });
-
-})
-
+export default UrlValidator;
